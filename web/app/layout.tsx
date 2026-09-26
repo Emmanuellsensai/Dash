@@ -3,8 +3,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "JS -> TS Cohort",
-  description: "Public reviews and leaderboard for the 30-day JS to TypeScript cohort.",
+  title: "Dash — AI grader for the JS → TS cohort",
+  description: "Submit your day's work, get an instant AI review, and watch the leaderboard.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -14,8 +14,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="layout">
           <aside className="sidebar">
             <div className="brand">
-              JS → TS Cohort
-              <small>30-day sprint</small>
+              Dash
+              <small>JS → TS · 30-day sprint</small>
             </div>
 
             <div className="nav-section">Main</div>

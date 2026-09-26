@@ -1,6 +1,6 @@
-# Cohort Review Web
+# Dash
 
-Public site for JS -> TS cohort. Students paste their GitHub repo URL + day number, get a Claude-generated review, and land on the public feed and leaderboard.
+AI grader for the JS → TS cohort. Students paste their GitHub repo URL + day number, get a Claude-generated review, and land on the public feed and leaderboard.
 
 Reads `../CLAUDE.md` (review rules) and `../curriculum/curriculum.md` (day-by-day requirements). Keep those two files up to date and the reviewer follows suit — no code change needed.
 
