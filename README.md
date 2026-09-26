@@ -1,15 +1,13 @@
 # Dash
 
-AI grader for a 30-day JavaScript → TypeScript cohort. Students paste a public GitHub repo URL and a day number; Dash pulls that day's folder, sends it to Claude with the day's curriculum requirements and the review rubric ([CLAUDE.md](CLAUDE.md)), and publishes the review to a public feed and leaderboard.
+AI grader for a 30-day JavaScript → TypeScript cohort. Students paste a public GitHub repo URL and a day number; Dash pulls that day's folder, sends it to Claude with the day's curriculum requirements and a private review rubric, and publishes the review to a public feed and leaderboard.
 
 ## Repo layout
 
 ```
 .
-├── CLAUDE.md              # review rules (the rubric the grader follows)
 ├── curriculum/
 │   └── curriculum.md      # 30-day curriculum, source of truth for what each day requires
-├── students.md            # roster (name + repo URL)
 ├── reviews/               # teacher-written reviews (optional, for manual grading)
 ├── progress/              # per-student status log
 ├── repos/                 # local clones of student repos (gitignored)
@@ -39,4 +37,4 @@ Just append it to `curriculum/curriculum.md` in the same `### DAY N: TITLE` form
 
 ## Tweaking how it grades
 
-Edit [CLAUDE.md](CLAUDE.md). The reviewer reads it fresh on every request (cached for cost), so any change there changes how new reviews look.
+Edit `web/lib/rules.ts`. That constant is the rubric the reviewer sends to Claude on every request (cached for cost).
