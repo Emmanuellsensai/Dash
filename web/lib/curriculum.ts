@@ -1,17 +1,16 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { RULES } from "./rules";
 
 /**
- * The curriculum.md file lives at repo root's curriculum/curriculum.md.
- * We read it from disk at request time (Vercel bundles files in the project);
- * for the web/ subfolder we go up one directory.
+ * curriculum.md lives at repo root's curriculum/curriculum.md. The web app
+ * ships from web/ but Vercel bundles files referenced with path.join, so this
+ * still works when the whole repo is deployed.
  */
 
 const CURRICULUM_FILE = path.join(process.cwd(), "..", "curriculum", "curriculum.md");
-const RULES_FILE = path.join(process.cwd(), "..", "CLAUDE.md");
 
 let curriculumCache: string | null = null;
-let rulesCache: string | null = null;
 
 async function readCurriculum(): Promise<string> {
   if (curriculumCache) return curriculumCache;
@@ -23,12 +22,7 @@ async function readCurriculum(): Promise<string> {
 }
 
 export async function readRules(): Promise<string> {
-  if (rulesCache) return rulesCache;
-  const p = process.env.RULES_PATH
-    ? path.resolve(process.cwd(), process.env.RULES_PATH)
-    : RULES_FILE;
-  rulesCache = await fs.readFile(p, "utf8");
-  return rulesCache;
+  return RULES;
 }
 
 /**
