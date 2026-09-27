@@ -1,8 +1,47 @@
-import { neon } from "@neondatabase/serverless";
+import https from "node:https";
+import { neon, neonConfig } from "@neondatabase/serverless";
 
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is not set");
 }
+
+neonConfig.fetchFunction = (input: string | URL, init: RequestInit = {}) =>
+  new Promise<Response>((resolve, reject) => {
+    const headers = Object.fromEntries(new Headers(init.headers).entries());
+    const request = https.request(
+      input,
+      { method: init.method, headers, family: 4, timeout: 15000 },
+      (response) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk: Buffer) => chunks.push(chunk));
+        response.on("end", () => {
+          const responseHeaders = new Headers();
+          for (const [name, value] of Object.entries(response.headers)) {
+            if (typeof value === "string") responseHeaders.set(name, value);
+            else if (Array.isArray(value)) {
+              for (const item of value) responseHeaders.append(name, item);
+            }
+          }
+          resolve(
+            new Response(Buffer.concat(chunks), {
+              status: response.statusCode,
+              statusText: response.statusMessage,
+              headers: responseHeaders,
+            }),
+          );
+        });
+      },
+    );
+
+    request.on("timeout", () => request.destroy(new Error("Database request timed out")));
+    request.on("error", reject);
+    if (typeof init.body === "string" || init.body instanceof Uint8Array) {
+      request.write(init.body);
+    } else if (init.body instanceof ArrayBuffer) {
+      request.write(Buffer.from(init.body));
+    }
+    request.end();
+  });
 
 export const sql = neon(process.env.DATABASE_URL);
 

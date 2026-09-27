@@ -1,11 +1,9 @@
-import { neon } from "@neondatabase/serverless";
+import { sql } from "../lib/db";
 
 async function main() {
   if (!process.env.DATABASE_URL) {
     throw new Error("Set DATABASE_URL in .env.local");
   }
-  const sql = neon(process.env.DATABASE_URL);
-
   await sql`
     create table if not exists students (
       id serial primary key,
