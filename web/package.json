@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "db:init": "node --env-file=.env.local --import tsx scripts/init-db.ts"
+    "db:migrate": "node --env-file=.env.local --import tsx scripts/migrate.ts"
   },
   "dependencies": {
     "@neon/config": "^1.8.2",
