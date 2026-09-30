@@ -1,21 +1,25 @@
 import Link from "next/link";
-import { recentReviews, leaderboard } from "@/lib/db";
+import { recentReviews, leaderboard, getPublishedDays } from "@/lib/db";
 import SubmitForm from "./SubmitForm";
 import { avatarColor, initial, medalClass } from "./ui";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const [reviews, board] = await Promise.all([recentReviews(8), leaderboard()]);
+  const [reviews, board, days] = await Promise.all([
+    recentReviews(8),
+    leaderboard(),
+    getPublishedDays(),
+  ]);
   return (
     <>
-      <h1 className="page-title">Submit for review</h1>
+      <h1 className="page-title">Submit for a review</h1>
       <p className="page-sub">
-        Paste your public GitHub repo URL and the day number. You get 2 fresh reviews per day; re-checks of the same commit are free.
+        Paste your public GitHub repo URL and pick a published day. Re-checks of the same commit are free.
       </p>
 
       <section className="panel">
-        <SubmitForm />
+        <SubmitForm days={days} />
       </section>
 
       <section className="panel">

@@ -95,28 +95,28 @@ export async function generateAdvisory(input: AdvisoryInput): Promise<Advisory> 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return { status: "unavailable", reason: "GEMINI_API_KEY is not set." };
 
-  const limit = Number(process.env.GEMINI_DAILY_LIMIT ?? "50");
-  const day = usageDay();
-  const used = await geminiUsage(day);
-  if (Number.isFinite(limit) && used >= limit) {
-    return { status: "skipped", reason: `Gemini daily limit of ${limit} reached.` };
-  }
-
-  const clean = input.files.filter((f) => parseSource(f.path, f.content).error === null);
-  const included: { path: string; content: string }[] = [];
-  let size = 0;
-  for (const f of clean) {
-    if (included.length > 0 && size + f.content.length > INPUT_BUDGET_CHARS) continue;
-    included.push(f);
-    size += f.content.length;
-  }
-  if (included.length === 0) return { status: "ok", findings: [] };
-
-  const lineCounts = new Map(
-    included.map((f) => [f.path, f.content.split("\n").length] as const),
-  );
-
   try {
+    const limit = Number(process.env.GEMINI_DAILY_LIMIT ?? "50");
+    const day = usageDay();
+    const used = await geminiUsage(day);
+    if (Number.isFinite(limit) && used >= limit) {
+      return { status: "skipped", reason: `Gemini daily limit of ${limit} reached.` };
+    }
+
+    const clean = input.files.filter((f) => parseSource(f.path, f.content).error === null);
+    const included: { path: string; content: string }[] = [];
+    let size = 0;
+    for (const f of clean) {
+      if (included.length > 0 && size + f.content.length > INPUT_BUDGET_CHARS) continue;
+      included.push(f);
+      size += f.content.length;
+    }
+    if (included.length === 0) return { status: "ok", findings: [] };
+
+    const lineCounts = new Map(
+      included.map((f) => [f.path, f.content.split("\n").length] as const),
+    );
+
     const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: TIMEOUT_MS } });
     let text: string | undefined;
     try {

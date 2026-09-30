@@ -2,13 +2,22 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export default function SubmitForm() {
+export interface FormDay {
+  day_number: number;
+  title: string;
+}
+
+export default function SubmitForm({ days }: { days: FormDay[] }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [repo, setRepo] = useState("");
-  const [day, setDay] = useState("1");
+  const [day, setDay] = useState(days.length > 0 ? String(days[0].day_number) : "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  if (days.length === 0) {
+    return <p className="muted">No days are published yet. Check back soon.</p>;
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -59,16 +68,16 @@ export default function SubmitForm() {
         <div>
           <label htmlFor="day">Day</label>
           <select id="day" value={day} onChange={(e) => setDay(e.target.value)}>
-            {Array.from({ length: 30 }, (_, i) => i + 1).map((d) => (
-              <option key={d} value={d}>
-                Day {d}
+            {days.map((d) => (
+              <option key={d.day_number} value={d.day_number}>
+                Day {d.day_number}: {d.title}
               </option>
             ))}
           </select>
         </div>
         <div>
           <button className="primary" type="submit" disabled={loading}>
-            {loading ? "Reviewing…" : "Review"}
+            {loading ? "Checking..." : "Check"}
           </button>
         </div>
       </div>
