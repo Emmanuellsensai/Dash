@@ -71,3 +71,21 @@ export function describeParams(schema: z.ZodTypeAny): ParamField[] {
     };
   });
 }
+
+export interface RuleTypeInfo {
+  id: string;
+  label: string;
+  fields: ParamField[];
+}
+
+/**
+ * Rule type descriptors for the admin UI. Computed on the server so the
+ * client bundle never pulls in the parsers.
+ */
+export function ruleTypeInfos(): RuleTypeInfo[] {
+  return Object.values(ruleModules).map((m) => ({
+    id: m.id,
+    label: m.label,
+    fields: describeParams(m.paramsSchema),
+  }));
+}

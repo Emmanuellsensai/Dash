@@ -303,6 +303,26 @@ export async function deleteRule(id: number): Promise<void> {
   await sql`delete from rules where id = ${id}`;
 }
 
+export async function getRule(id: number): Promise<Rule | null> {
+  const rows = (await sql`select * from rules where id = ${id} limit 1`) as Rule[];
+  return rows[0] ?? null;
+}
+
+export async function ruleCounts(): Promise<{ day_number: number; count: number }[]> {
+  return (await sql`
+    select day_number, count(*)::int as count
+    from rules
+    group by day_number
+    order by day_number asc
+  `) as { day_number: number; count: number }[];
+}
+
+export async function setRuleOrder(ids: number[]): Promise<void> {
+  for (let i = 0; i < ids.length; i++) {
+    await sql`update rules set position = ${i + 1} where id = ${ids[i]}`;
+  }
+}
+
 export async function nextRulePosition(dayNumber: number): Promise<number> {
   const rows = (await sql`
     select coalesce(max(position), 0) + 1 as next from rules where day_number = ${dayNumber}

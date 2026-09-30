@@ -1,10 +1,13 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import {
   SESSION_COOKIE,
   SESSION_MAX_AGE,
   createSessionToken,
 } from "@/lib/session";
+
+const loginSchema = z.object({ password: z.string().min(1) });
 
 export const runtime = "nodejs";
 
@@ -20,8 +23,9 @@ export async function POST(req: NextRequest) {
   if (!expected) {
     return NextResponse.json({ error: "ADMIN_PASSWORD is not set." }, { status: 500 });
   }
-  const body = (await req.json().catch(() => ({}))) as { password?: unknown };
-  const password = typeof body.password === "string" ? body.password : "";
+  const raw = await req.json().catch(() => null);
+  const parsed = loginSchema.safeParse(raw);
+  const password = parsed.success ? parsed.data.password : "";
   if (!password || !matches(password, expected)) {
     return NextResponse.json({ error: "Wrong password." }, { status: 401 });
   }
