@@ -36,6 +36,24 @@ Open http://localhost:3000. Admin area: http://localhost:3000/admin/login.
 | `GEMINI_DAILY_LIMIT` | cap on Gemini calls per day |
 | `MAX_ATTEMPTS_PER_SUBMISSION` | attempts per (student, day), admin bypasses |
 
+## Gemini advisory and free tier limits
+
+Advisory notes use the official Google Gen AI SDK for JavaScript (`@google/genai`) with structured JSON output (`responseMimeType: application/json` plus `responseJsonSchema`). The model name always comes from `GEMINI_MODEL`, never from code.
+
+Free tier facts from the official rate limits doc (https://ai.google.dev/gemini-api/docs/rate-limits, checked September 2026):
+
+- Limits apply per Google Cloud project, not per API key.
+- They are measured on three axes: requests per minute (RPM), tokens per minute (TPM) and requests per day (RPD).
+- RPD quotas reset at midnight Pacific time. The `gemini_usage` table is keyed on that same Pacific date, so `GEMINI_DAILY_LIMIT` lines up with Google's reset.
+- The free tier has no spend based rate limit (paid tiers do, returning 429 RESOURCE_EXHAUSTED).
+- Exact per model numbers are account specific and shown in AI Studio (https://aistudio.google.com/rate-limit), so keep `GEMINI_DAILY_LIMIT` (default 50) comfortably below the RPD for your model.
+
+Guard rails in the app:
+
+- A single advisory call times out after 20 seconds and any error, quota hit or missing key stores `advisory = { status: "unavailable", reason }` while the deterministic review still saves.
+- Advisory findings are post filtered: a finding is dropped if its line does not exist in the file, if the text contains fix style language, or if it contains backticks.
+- Unchanged commits reuse the stored advisory, and the status never depends on Gemini.
+
 ## Getting a Neon Postgres URL
 
 1. https://neon.tech -> new project (free tier)

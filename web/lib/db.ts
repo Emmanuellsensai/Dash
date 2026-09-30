@@ -327,6 +327,29 @@ export async function geminiUsage(day: string): Promise<number> {
   return rows[0]?.count ?? 0;
 }
 
+/**
+ * Reuse a stored advisory for the same commit so an unchanged submission
+ * does not spend another Gemini call.
+ */
+export async function cachedAdvisory(
+  submissionId: number,
+  commitSha: string | null,
+): Promise<Advisory | null> {
+  if (!commitSha) return null;
+  const rows = (await sql`
+    select r.advisory
+    from reviews r
+    join submissions s on s.id = r.submission_id
+    where r.submission_id = ${submissionId}
+      and s.commit_sha = ${commitSha}
+      and r.advisory is not null
+      and r.advisory->>'status' = 'ok'
+    order by r.created_at desc
+    limit 1
+  `) as { advisory: Advisory }[];
+  return rows[0]?.advisory ?? null;
+}
+
 export async function latestReviewForCommit(
   submissionId: number,
   commitSha: string | null,
