@@ -30,11 +30,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
           {review.status.replace(/_/g, " ")}
         </span>
       </div>
-      <p className="page-sub">
-        {new Date(review.created_at).toLocaleString()} · {review.model} ·{" "}
-        {review.tokens_input + review.tokens_output} tokens · $
-        {(review.cost_cents / 100).toFixed(3)}
-      </p>
+      <p className="page-sub">{new Date(review.created_at).toLocaleString()}</p>
       <section className="panel">
         <pre className="review-body">{review.body}</pre>
       </section>

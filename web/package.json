@@ -9,13 +9,14 @@
     "db:init": "node --env-file=.env.local --import tsx scripts/init-db.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.1",
     "@neon/config": "^1.8.2",
-    "@neon/env": "^1.4.7",
     "@neondatabase/serverless": "^0.10.4",
+    "@tailwindcss/postcss": "^4.3.3",
+    "jose": "^6.2.12",
     "next": "^15.1.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

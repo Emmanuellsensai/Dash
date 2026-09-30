@@ -151,13 +151,6 @@ export async function latestReviewForCommit(
   return rows[0] ?? null;
 }
 
-export async function totalSpendCents(): Promise<number> {
-  const rows = (await sql`select coalesce(sum(cost_cents), 0)::int as total from reviews`) as {
-    total: number;
-  }[];
-  return rows[0]?.total ?? 0;
-}
-
 export async function recentReviews(limit = 25): Promise<Review[]> {
   return (await sql`
     select r.*, s.day_number, st.name as student_name

@@ -1,6 +1,5 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { RULES } from "./rules";
 
 /**
  * curriculum.md lives at repo root's curriculum/curriculum.md. The web app
@@ -19,10 +18,6 @@ async function readCurriculum(): Promise<string> {
     : CURRICULUM_FILE;
   curriculumCache = await fs.readFile(p, "utf8");
   return curriculumCache;
-}
-
-export async function readRules(): Promise<string> {
-  return RULES;
 }
 
 /**

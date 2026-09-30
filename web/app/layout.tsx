@@ -3,8 +3,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Dash — AI grader for the JS → TS cohort",
-  description: "Submit your day's work, get an instant AI review, and watch the leaderboard.",
+  title: "Dash · code checker for the JS to TS cohort",
+  description: "Submit your day's work, get a rule based review, and watch the leaderboard.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
