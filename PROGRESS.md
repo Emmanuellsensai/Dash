@@ -128,6 +128,21 @@ messages, commit after each phase, never push unless asked.
 7. React SSR inserts `<!-- -->` between adjacent text nodes, so string checks on rendered HTML
    must accept `Day<!-- -->1` style output.
 
+## Gemini advisory verification (2026-10-01, in progress)
+
+The user set GEMINI_API_KEY, GEMINI_MODEL=gemini-3.8-flash and GEMINI_DAILY_LIMIT in
+`web/.env.local`. A live dry run with `useGemini: true` reached the real Gemini API. The model
+answered every call (5 attempts over a minute) with 503 UNAVAILABLE "high demand", a known
+Google side capacity problem across Gemini models. The app's fail-soft path is therefore
+VERIFIED LIVE with a real API error: the dry run still returned 200 with
+`advisory.status = "unavailable"` and the engine status untouched.
+
+Not yet verified: the happy path, meaning real findings flowing through JSON parsing, the
+no-fixes filter and the review page. `web/scripts/advisory-live.mjs` (untracked one-off script)
+retries up to 4 times and checks every finding against the filter rules; rerun it once a model
+answers. Side note: each call counts against the daily quota even when it fails, by design
+(`incrementGeminiUsage` runs in `finally`). Usage resets at midnight Pacific.
+
 ## Open decisions for the user
 
 1. Keep or delete `web/scripts/verify-phase7.mjs` (untracked, now working end to end).
