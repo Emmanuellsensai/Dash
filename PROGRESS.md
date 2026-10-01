@@ -4,17 +4,43 @@ Saved: 2026-10-01. This file exists so a new session can resume exactly where th
 
 ## Status summary
 
-All 7 build phases are complete, committed locally and **not pushed**. Every code check passes.
-Phase 7 (verification with real data) is the only phase left: the automated end to end script has
-been written but has not yet succeeded against a healthy server, because earlier attempts hit
-environment issues (stale dev server, polluted `.next` build), not code issues.
+All 7 build phases are complete, committed locally on branch `neon-db_setup` and **not pushed**.
+Phase 7 (verification with real data) **executed successfully on 2026-10-01**. Every check passes.
 
 ```
 npx tsc --noEmit   PASS
 npm run build      PASS
 npm test           PASS (15 files, 80 tests)
 npm run db:migrate RAN against web/.env.local, schema verified
+Phase 7 script     PASS (login, curriculum import, day, 14 rules, dry run, submit, pages)
 ```
+
+## Phase 7 verification results (2026-10-01)
+
+Run against the real repo `https://github.com/Emmanuellsensai/javascript/tree/master/DAY%201`:
+
+- Login, curriculum import (1102 chars, filenames experiments.js and converter.js), day 1
+  creation, requirements publish and 14 rules all succeeded through the admin APIs.
+- Dry run: REDO with 3/14 passing. Public submit: review 1, status REDO, 14 rule results,
+  advisory `unavailable (GEMINI_MODEL is not set.)` as expected without Gemini env vars.
+- All pages 200: `/review/1`, `/feed`, `/leaderboard`, `/`, `/admin/days/1`. Review page shows
+  the rule checklist, the advisory section and file line evidence. Feed and leaderboard list the
+  student.
+- The REDO verdict is correct on real data. The student's actual files are named
+  `experiment.js` (singular) and `conveter.js` (misspelled), so the 10 file name rules fail with
+  "No file matching" evidence, and the code has a loose equality at `experiment.js` line 11.
+- Follow up dry run with the two filename patterns corrected to the student's actual names gave
+  12/14 passing, and the 2 remaining failures are genuine content failures: no SURPRISES comment
+  block in experiment.js, and the loose equality at line 11. This confirms the dry run tuning
+  loop works and the engine reports accurate file and line evidence.
+- The script initially printed `admin lists day: false`. That was a check artifact: React SSR
+  renders `Day<!-- -->1`, so the literal string `Day 1` is not in the HTML. The row renders.
+  The script check now accepts the SSR comment form and passes.
+
+Script fixes made during the run (file is untracked, see "Open decisions"):
+
+1. The curriculum call was missing the session cookie, which gave 401 on the first run.
+2. The admin page check now matches `Day<!-- -->1` as well as `Day 1`.
 
 ## Commits (local branch `neon-db_setup`, nothing pushed)
 
@@ -65,23 +91,17 @@ messages, commit after each phase, never push unless asked.
 
 ## Environment state
 
-- `web/.env.local` now contains: `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `ADMIN_PASSWORD`,
-  `SESSION_SECRET` (added by the user), `GITHUB_TOKEN` (present but EMPTY, the app then calls
-  GitHub unauthenticated, fine for verification), `MAX_ATTEMPTS_PER_SUBMISSION`.
-- `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_DAILY_LIMIT` are NOT set. The advisory will store
+- `web/.env.local` contains: `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `ADMIN_PASSWORD`,
+  `SESSION_SECRET`, `GITHUB_TOKEN` (present but EMPTY, the app then calls GitHub
+  unauthenticated, fine for verification), `MAX_ATTEMPTS_PER_SUBMISSION`.
+- `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_DAILY_LIMIT` are NOT set. The advisory stores
   `{ status: "unavailable", reason: "GEMINI_MODEL is not set." }` and reviews still save with a
-  visible note. That is expected, not a bug.
-- Database (`DATABASE_URL` in `web/.env.local`) is migrated and currently EMPTY: 0 days,
-  0 rules, 0 reviews, 0 students. Verified after the last failed attempt.
-- GitHub API reachable from this machine. The repo used for verification is public.
-
-## Values provided by the user for Phase 7
-
-- Repo URL: `https://github.com/Emmanuellsensai/javascript/tree/master/DAY%201`
-  (folder `DAY 1` on branch `master`, URL decoded by `parseRepo`)
-- Day number: `1`
-- Day title used: `Values, types, coercion`
-- Student name for the public submission: `Emmanuellsensai`
+  visible note. Expected, not a bug.
+- Database is migrated and now contains real Phase 7 data: day 1 "Values, types, coercion"
+  published with 14 rules, review 1 for student Emmanuellsensai with status REDO and full rule
+  results. This is real user data from the real repo, not seeded fake data.
+- Correct password admin login has now been tested end to end (the Phase 7 script logs in and
+  holds the session through all admin calls).
 
 ## Environment gotchas discovered (read before running the server)
 
@@ -101,64 +121,16 @@ messages, commit after each phase, never push unless asked.
    and do not verify the DB with raw `neon()` outside `lib/db.ts`.
 5. Background servers started inside a tool call do not reliably survive to the next tool call.
    Start the server and run the verification inside the SAME tool call.
+6. `npm run build` on this machine takes 5 to 7 minutes. A 300 second tool timeout kills the
+   build during final manifest writes (symptom: `BUILD_ID` exists but `prerender-manifest.json`,
+   `fallbacks-manifest.json` and `images-manifest.json` are missing, then `next start` 500s).
+   Use a 600 second timeout, or write the build to a log file and check the exit code.
+7. React SSR inserts `<!-- -->` between adjacent text nodes, so string checks on rendered HTML
+   must accept `Day<!-- -->1` style output.
 
-## Exact resume steps (Phase 7, steps 3 to 5)
+## Open decisions for the user
 
-1. Make sure nothing is listening on 3000 (own tool call):
-   ```bash
-   pgrep -af "[n]ext"; pkill -f "[n]ext-server" 2>/dev/null; pkill -f "[n]ext dev" 2>/dev/null
-   ```
-2. Clean production build (own tool call, cwd `web`):
-   ```bash
-   rm -rf .next && npm run build
-   ```
-3. Start the server and run the verification script in ONE tool call (cwd `web`):
-   ```bash
-   (npm start > /tmp/dash-verify.log 2>&1 &)
-   for i in $(seq 1 40); do code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ || true); [ "$code" = "200" ] && break; sleep 1; done
-   echo "server ready: $code"
-   node scripts/verify-phase7.mjs
-   STATUS=$?
-   pkill -f "[n]ext-server" 2>/dev/null
-   exit $STATUS
-   ```
-4. What `web/scripts/verify-phase7.mjs` does and prints, in order:
-   - logs into `/api/admin/login` using `ADMIN_PASSWORD` from `web/.env.local` (value never printed),
-   - imports day 1 requirements from `curriculum/curriculum.md` via `/api/admin/curriculum?day=1`,
-   - creates day 1, fills requirements, publishes it (aborts with a clear message if day 1 already
-       exists; if that happens delete it in `/admin` first, the DB was empty at save time),
-   - creates 14 real rules: file_exists experiments.js and converter.js, comment_contains
-       SURPRISES, syntax_present template_literal and typeof in experiments.js, strict_equality in
-       `**/*.js`, syntax_forbidden loose_equality, four function_defined rules for nairaToUsd,
-       usdToNaira, celsiusToFahrenheit and kgToPounds with mustReturnValue, call_usage
-       console.log top level min 1 (required) and inside function max 0 (advisory),
-       naming_convention functions camelCase in converter.js (advisory),
-   - runs the dry run against the real repo with `useGemini: true`, prints status, per rule
-       failures with file and line evidence, and the advisory status (expected:
-       `unavailable (GEMINI_MODEL is not set.)`),
-   - submits the same repo through the public `/api/submit`,
-   - checks `/review/<id>`, `/feed`, `/leaderboard`, `/` and `/admin/days/1` return 200 and that
-       the review page shows the rule checklist, the advisory section and file line evidence.
-5. Possible legitimate outcomes that are NOT failures: the review status may be REDO or PASS
-   WITH FIXES depending on what is actually in the `DAY 1` folder of the real repo; the
-   advisory is unavailable until Gemini env vars are set.
-6. If a rule fails because a file lives in a subfolder (for example the pattern `experiments.js`
-   does not match `src/experiments.js`), adjust that rule's `file_pattern` in the script or in
-   `/admin/days/1` and rerun. The dry run exists for exactly this.
-7. After a successful run, produce the final report required by Phase 7: what changed, files
-   added and removed, env vars needed, anything not verified. Decide with the user whether
-   `web/scripts/verify-phase7.mjs` stays (it is currently untracked) or is deleted.
-
-## Verification already done before this file was written
-
-- `npx tsc --noEmit`, `npm run build`, `npm test` all green on the final code.
-- `npm run db:migrate` succeeded; schema checked: `days`, `rules`, `rate_limits`, `gemini_usage`
-  created, `reviews` has `rule_results`, `advisory`, `engine_version` and no model/token/cost
-  columns, `students` and `submissions` unchanged.
-- Dev server smoke test: `/`, `/feed`, `/leaderboard`, `/admin/login` returned 200, `/admin`
-  redirected to `/admin/login?next=%2Fadmin`, empty submit body returned the zod 400, wrong admin
-  password returned 401. Correct password returned 500 only because `SESSION_SECRET` was missing
-  at that time; the user has since added it (grep confirms both `ADMIN_PASSWORD` and
-  `SESSION_SECRET` exist), but the correct password path has NOT been retested yet.
-- A fresh clean production build completed at 01:33 on 2026-10-01 (`.next/BUILD_ID` fresh,
-  `middleware.js` has no eval). No server is running and no day data exists yet.
+1. Keep or delete `web/scripts/verify-phase7.mjs` (untracked, now working end to end).
+2. Commit the Phase 7 verification state (script fix plus this progress file) locally.
+3. Whether to push the branch.
+4. Whether to set the Gemini env vars in `web/.env.local` to see the advisory live.

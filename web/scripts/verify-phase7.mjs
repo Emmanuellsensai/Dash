@@ -48,7 +48,7 @@ if (login.status !== 200) fail("login", login);
 const cookie = login.setCookie.split(";")[0];
 log("login", "ok");
 
-const curr = await call(`/api/admin/curriculum?day=${DAY}`);
+const curr = await call(`/api/admin/curriculum?day=${DAY}`, { cookie });
 if (curr.status !== 200) fail("curriculum import", curr);
 log(
   "curriculum",
@@ -266,6 +266,6 @@ log("feed lists student", String(feedHtml.includes(STUDENT)));
 const lbHtml = await (await fetch(BASE + "/leaderboard")).text();
 log("leaderboard lists student", String(lbHtml.includes(STUDENT)));
 const adminHtml = await (await fetch(BASE + "/admin", { headers: { Cookie: cookie } })).text();
-log("admin lists day", String(adminHtml.includes(`Day ${DAY}`)));
+log("admin lists day", String(/Day(<!-- -->|\s)+1/.test(adminHtml)));
 
 console.log("DONE");
