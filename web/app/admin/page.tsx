@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { getAllDays, ruleCounts } from "@/lib/db";
+import { getAdminPasswordValue } from "@/lib/adminPassword";
 import LogoutButton from "./LogoutButton";
+import PasswordForm from "./PasswordForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminHome() {
   const [days, counts] = await Promise.all([getAllDays(), ruleCounts()]);
   const countBy = new Map(counts.map((c) => [c.day_number, c.count]));
+  const hasExistingPassword = Boolean(getAdminPasswordValue() && getAdminPasswordValue().trim());
 
   return (
     <>
@@ -25,6 +28,13 @@ export default async function AdminHome() {
         Days, requirements and rules. A day appears on the submit form once it is published with
         at least one enabled rule.
       </p>
+
+      <section className="panel">
+        <h2 className="page-title" style={{ marginTop: 0, marginBottom: 8, fontSize: 24 }}>
+          Password
+        </h2>
+        <PasswordForm hasExistingPassword={hasExistingPassword} />
+      </section>
 
       <section className="panel" style={{ padding: 0 }}>
         {days.length === 0 ? (
