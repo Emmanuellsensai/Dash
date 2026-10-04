@@ -1,13 +1,19 @@
 import "./globals.css";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import type { Metadata } from "next";
+import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
 
 export const metadata: Metadata = {
-  title: "Dash — AI grader for the JS → TS cohort",
-  description: "Submit your day's work, get an instant AI review, and watch the leaderboard.",
+  title: "Dash · code checker for the JS to TS cohort",
+  description: "Submit your day's work, get a rule based review, and watch the leaderboard.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE)?.value;
+  const isAdminLoggedIn = token ? await verifySessionToken(token) : false;
+
   return (
     <html lang="en">
       <body>
@@ -27,6 +33,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Link>
             <Link href="/feed" className="nav-link">
               <span className="dot" /> All reviews
+            </Link>
+
+            <div className="nav-section">Admin</div>
+            <Link href={isAdminLoggedIn ? "/admin" : "/admin/login"} className="nav-link">
+              <span className="dot" /> {isAdminLoggedIn ? "Admin dashboard" : "Admin login"}
             </Link>
 
             <div className="nav-section">Resources</div>

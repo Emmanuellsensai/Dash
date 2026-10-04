@@ -1,81 +1,75 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import {
-  upsertStudent,
+  cachedAdvisory,
+  getDayWithRules,
   getOrCreateSubmission,
   incrementAttempts,
   insertReview,
   latestReviewForCommit,
+  upsertStudent,
 } from "@/lib/db";
 import { fetchDaySubmission } from "@/lib/github";
-import { daySection, readRules } from "@/lib/curriculum";
-import { reviewSubmission } from "@/lib/claude";
+import { ENGINE_VERSION, runRules } from "@/lib/engine/run";
+import { computeStatus } from "@/lib/engine/status";
+import { generateAdvisory } from "@/lib/gemini";
+import { buildSummary } from "@/lib/format";
 import { allow } from "@/lib/rateLimit";
+import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-interface Body {
-  name?: string;
-  repo?: string;
-  day?: number;
-  admin?: string;
+const bodySchema = z.object({
+  name: z.string().trim().min(1),
+  repo: z.string().trim().min(1),
+  day: z.number().int().min(1),
+});
+
+function truncationNote(skipped: string[]): string {
+  const shown = skipped.slice(0, 10).join(", ");
+  const more = skipped.length > 10 ? `, +${skipped.length - 10} more` : "";
+  return `\nNote: submission truncated, ${skipped.length} file(s) skipped: ${shown}${more}.`;
 }
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anon";
-  const body = (await req.json().catch(() => ({}))) as Body;
-
-  const name = (body.name ?? "").trim();
-  const repo = (body.repo ?? "").trim();
-  const day = Number(body.day);
-  const isAdmin =
-    !!process.env.ADMIN_PASSWORD && body.admin === process.env.ADMIN_PASSWORD;
-
-  if (!name || !repo || !Number.isInteger(day) || day < 1 || day > 30) {
+  const raw = await req.json().catch(() => null);
+  const parsed = bodySchema.safeParse(raw);
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: "Send { name, repo, day } (day 1-30)." },
+      { error: "Send { name, repo, day } with day 1 or higher." },
       { status: 400 },
     );
   }
-  if (!isAdmin && !allow(ip)) {
+  const { name, repo, day } = parsed.data;
+
+  const isAdmin = await verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value);
+  if (!isAdmin && !(await allow(ip))) {
     return NextResponse.json({ error: "Slow down. Try again in 30 seconds." }, { status: 429 });
   }
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ error: "Server is missing ANTHROPIC_API_KEY." }, { status: 500 });
-  }
 
-  const section = await daySection(day);
-  if (!section) {
-    return NextResponse.json(
-      { error: `Day ${day} is not in the curriculum yet.` },
-      { status: 400 },
-    );
+  const withRules = await getDayWithRules(day, { enabledOnly: true });
+  if (!withRules || !withRules.day.published || withRules.rules.length === 0) {
+    return NextResponse.json({ error: `Day ${day} is not set up yet.` }, { status: 400 });
   }
+  const { day: dayRow, rules } = withRules;
 
   const fetched = await fetchDaySubmission(repo, day);
   if ("error" in fetched) {
     return NextResponse.json({ error: fetched.error }, { status: 400 });
   }
-  if (!fetched.files.length) {
-    return NextResponse.json(
-      { error: `No code files found in ${fetched.folderPath}.` },
-      { status: 400 },
-    );
-  }
 
   const student = await upsertStudent(name, repo);
   const submission = await getOrCreateSubmission(student.id, day, fetched.lastCommitSha);
 
-  // Commit-hash dedup: same commit as last review -> return the stored review, no charge.
   if (fetched.lastCommitSha) {
     const cached = await latestReviewForCommit(submission.id, fetched.lastCommitSha);
-    if (cached) {
-      return NextResponse.json({ review: cached, cached: true });
-    }
+    if (cached) return NextResponse.json({ review: cached, cached: true });
   }
 
   const cap = Number(process.env.MAX_ATTEMPTS_PER_SUBMISSION ?? "2");
-  if (!isAdmin && submission.attempts >= cap) {
+  if (!isAdmin && cap > 0 && submission.attempts >= cap) {
     return NextResponse.json(
       {
         error: `You've used your ${cap} review attempts for day ${day}. Push a new commit or ask the teacher.`,
@@ -85,27 +79,37 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const rules = await readRules();
-    const result = await reviewSubmission({
-      rules,
-      daySection: section,
-      studentName: name,
-      day,
-      files: fetched.files,
-      folderPath: fetched.folderPath,
-      commitSha: fetched.lastCommitSha,
-      commitDate: fetched.lastCommitDate,
-      truncated: fetched.truncated,
-    });
+    const results = runRules(fetched.files, rules, dayRow);
+    const status = computeStatus(results);
+
+    let advisory = await cachedAdvisory(submission.id, fetched.lastCommitSha);
+    if (!advisory) {
+      try {
+        advisory = await generateAdvisory({
+          files: fetched.files,
+          requirementsMd: dayRow.requirements_md,
+        });
+      } catch (e) {
+        advisory = {
+          status: "unavailable",
+          reason: e instanceof Error ? e.message.slice(0, 200) : "Advisory failed.",
+        };
+      }
+    }
+
+    let body = buildSummary(results, status, advisory);
+    if (fetched.truncated && fetched.skipped.length > 0) {
+      body += truncationNote(fetched.skipped);
+    }
+
     await incrementAttempts(submission.id, fetched.lastCommitSha);
     const saved = await insertReview({
       submissionId: submission.id,
-      status: result.status,
-      body: result.body,
-      model: result.model,
-      tokensInput: result.tokensInput,
-      tokensOutput: result.tokensOutput,
-      costCents: result.costCents,
+      status,
+      body,
+      ruleResults: results,
+      advisory,
+      engineVersion: ENGINE_VERSION,
     });
     return NextResponse.json({ review: { ...saved, student_name: name, day_number: day } });
   } catch (e) {
